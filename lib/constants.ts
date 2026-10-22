@@ -28,7 +28,7 @@ export const NAV = [
 ] as const;
 
 export const SHOP_URL = "#offer";
-export const CHECKOUT_URL = "#checkout";
+export const CHECKOUT_URL = "encomenda";
 
 export const MODEL_PATH = "/models/candle.glb";
 export const EMBLEM_PATH = "/brand/emblem.png";
