@@ -27,7 +27,7 @@ export const NAV = [
   { label: "About", href: "#about" },
 ] as const;
 
-export const SHOP_URL = "#offer";
+export const SHOP_URL = "encomenda";
 export const CHECKOUT_URL = "encomenda";
 
 export const MODEL_PATH = "/models/candle.glb";
