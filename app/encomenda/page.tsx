@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BRAND } from "@/lib/constants";
 import OrderForm from "./OrderForm";
-
-const BRAND = "CTRL + SHIFT + CANDLE";
 
 export const metadata: Metadata = {
   title: `Encomenda | ${BRAND}`,
   description: "Encomende a sua vela. Preencha os dados de entrega.",
+};
+
+const PRODUCT = {
+  name: "Deep Work Candle",
+  price: "$49.99",
+  features: ["16 oz", "Soy wax blend", "Wood wick", "80+ hours burn time"],
 };
 
 export default function EncomendaPage() {
@@ -32,6 +37,31 @@ export default function EncomendaPage() {
             sua encomenda.
           </p>
         </header>
+
+        <section
+          aria-label="Produto"
+          className="mb-12 rounded-2xl border border-gold-dim/40 bg-ink2 p-6 sm:p-8"
+        >
+          <h2 className="font-display text-3xl text-gold sm:text-4xl">
+            {PRODUCT.name}
+          </h2>
+          <p className="mt-3 font-display text-4xl text-gold sm:text-5xl">
+            {PRODUCT.price}
+          </p>
+          <ul className="mt-6">
+            {PRODUCT.features.map((f) => (
+              <li
+                key={f}
+                className="flex items-center gap-4 border-t border-gold-dim/30 py-3 font-body text-sm text-gold/90 last:border-b"
+              >
+                <span aria-hidden className="text-gold-dim">
+                  —
+                </span>
+                {f}
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <OrderForm />
       </div>
