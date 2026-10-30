@@ -4,15 +4,12 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 
 /**
- * Contrato com o site admin: POST ${NEXT_PUBLIC_ADMIN_URL}/api/orders
- * Resposta 201: { orderNumber, total }. Erros: { error: "mensagem" }.
- * NEXT_PUBLIC_* é fixado no build: depois de alterar na Vercel, fazer redeploy.
+ * Contrato assumido para o corpo do POST /api/orders (Order sem id, status,
+ * total e datas). Quando lib/orders/types.ts existir, trocar por:
+ *   import type { Order } from "@/lib/orders/types";
+ *   type OrderPayload = Omit<Order, "id" | "status" | "total" | "createdAt" | "updatedAt">;
+ * e ajustar os nomes dos campos em buildPayload() se forem diferentes.
  */
-const ADMIN_URL = (process.env.NEXT_PUBLIC_ADMIN_URL ?? "").replace(/\/+$/, "");
-// Moeda mostrada no total da confirmação. Alinhar com CURRENCY do admin.
-const CURRENCY = "USD";
-const REQUEST_TIMEOUT_MS = 15000;
-
 type OrderPayload = {
   customerName: string;
   phone: string;
@@ -168,13 +165,16 @@ function Field({
   );
 }
 
+// Enquanto estiver a true, mostra por baixo do erro o motivo técnico. Pôr false quando tudo funcionar.
+const DEBUG = true;
+
 export default function OrderForm() {
   const [form, setForm] = useState<FormState>(INITIAL);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
-  const [total, setTotal] = useState<number | null>(null);
 
   function set<K extends keyof FormState>(key: K, value: string) {
     setForm((p) => ({ ...p, [key]: value }));
@@ -199,6 +199,7 @@ export default function OrderForm() {
     ev.preventDefault();
     if (submitting) return;
     setServerError(null);
+    setDebugInfo(null);
 
     const found = validate(form);
     setErrors(found);
@@ -208,55 +209,50 @@ export default function OrderForm() {
       return;
     }
 
-    if (!ADMIN_URL) {
-      setServerError(
-        "As encomendas estão temporariamente indisponíveis. Tente mais tarde ou contacte-nos directamente.",
-      );
-      return;
-    }
-
     setSubmitting(true);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const adminUrl = (process.env.NEXT_PUBLIC_ADMIN_URL ?? "").replace(/\/$/, "");
+    const target = `${adminUrl}/api/orders`;
     try {
-      const res = await fetch(`${ADMIN_URL}/api/orders`, {
+      if (!adminUrl) {
+        setDebugInfo(
+          "NEXT_PUBLIC_ADMIN_URL está vazio nesta versão do site. Crie a variável na Vercel da loja e faça Redeploy.",
+        );
+      }
+      const res = await fetch(target, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload(form)),
-        signal: controller.signal,
       });
       const data = await res.json().catch(() => null);
+      if (DEBUG) {
+        setDebugInfo(
+          `POST ${target || "(vazio)"} → ${res.status}` +
+            (data && typeof data.error === "string" ? ` · ${data.error}` : ""),
+        );
+      }
 
       if (!res.ok) {
-        const msg = data && typeof data.error === "string" ? data.error : null;
         setServerError(
-          msg ||
-            (res.status === 429
-              ? "Demasiados pedidos. Aguarde um momento e tente novamente."
-              : res.status >= 500
-                ? "O servidor de encomendas teve um problema. Tente novamente dentro de instantes."
-                : "Não foi possível registar a encomenda. Verifique os dados e tente novamente."),
+          (data && typeof data.error === "string" && data.error) ||
+            "Não foi possível registar a encomenda. Tente novamente dentro de instantes.",
         );
         return;
       }
 
-      if (!data || data.orderNumber == null) {
-        setServerError(
-          "A encomenda pode ter sido registada, mas não recebemos o número. Contacte-nos antes de repetir o pedido.",
-        );
-        return;
-      }
-      setOrderNumber(String(data.orderNumber));
-      setTotal(typeof data.total === "number" ? data.total : null);
-    } catch (err) {
-      const aborted = err instanceof DOMException && err.name === "AbortError";
+      const num = data?.orderNumber ?? data?.order?.orderNumber;
+      setOrderNumber(num != null ? String(num) : "—");
+    } catch (e) {
       setServerError(
-        aborted
-          ? "O servidor demorou demasiado a responder. Tente novamente dentro de instantes."
-          : "Não foi possível contactar o servidor de encomendas. Verifique a sua ligação à internet e tente novamente; se o problema continuar, volte mais tarde.",
+        "Não foi possível contactar o servidor de encomendas. Tente novamente dentro de instantes.",
       );
+      if (DEBUG) {
+        setDebugInfo(
+          `POST ${target || "(vazio)"} → falhou antes de chegar (endereço errado ou CORS). ${
+            e instanceof Error ? e.message : ""
+          }`,
+        );
+      }
     } finally {
-      clearTimeout(timer);
       setSubmitting(false);
     }
   }
@@ -277,12 +273,6 @@ export default function OrderForm() {
           Número da encomenda
         </p>
         <p className="mt-2 break-all font-display text-3xl text-gold">{orderNumber}</p>
-        {total !== null && (
-          <p className="mt-4 font-body text-sm text-gold/80">
-            Total:{" "}
-            {new Intl.NumberFormat("en-US", { style: "currency", currency: CURRENCY }).format(total)}
-          </p>
-        )}
         <p className="mt-6 font-body text-sm leading-relaxed text-gold/70">
           Guarde este número. Entraremos em contacto através do email{" "}
           {form.email.trim()} para confirmar a entrega.
@@ -382,6 +372,12 @@ export default function OrderForm() {
           className="rounded-lg border border-red-400/60 px-4 py-3 font-body text-sm text-red-400"
         >
           {serverError}
+        </p>
+      )}
+
+      {DEBUG && debugInfo && (
+        <p className="break-all rounded-lg border border-gold-dim/50 px-4 py-3 font-body text-xs text-gold/80">
+          Diagnóstico: {debugInfo}
         </p>
       )}
 
