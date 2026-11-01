@@ -14,7 +14,23 @@ const PRODUCT = {
   features: ["16 oz", "Soy wax blend", "Wood wick", "80+ hours burn time"],
 };
 
-export default function EncomendaPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+/** Aceita só um número de encomenda com aspeto normal (ex.: CSC-0001). */
+function orderParam(value: string | string[] | undefined): string | undefined {
+  const s = Array.isArray(value) ? value[0] : value;
+  return s && /^[A-Za-z0-9-]{1,24}$/.test(s) ? s : undefined;
+}
+
+export default async function EncomendaPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const sp = await searchParams;
+  const paid = orderParam(sp.pago);
+  const cancelled = orderParam(sp.cancelado);
+
   return (
     <main className="min-h-screen bg-ink px-5 py-10 sm:px-8 sm:py-16">
       <div className="mx-auto w-full max-w-2xl">
@@ -32,38 +48,42 @@ export default function EncomendaPage() {
           <h1 className="mt-3 font-display text-4xl text-gold sm:text-5xl">
             Encomenda
           </h1>
-          <p className="mt-4 font-body text-sm leading-relaxed text-gold/70">
-            Preencha os dados abaixo e entraremos em contacto para confirmar a
-            sua encomenda.
-          </p>
+          {!paid && (
+            <p className="mt-4 font-body text-sm leading-relaxed text-gold/70">
+              Preencha os dados abaixo e entraremos em contacto para confirmar a
+              sua encomenda.
+            </p>
+          )}
         </header>
 
-        <section
-          aria-label="Produto"
-          className="mb-12 rounded-2xl border border-gold-dim/40 bg-ink2 p-6 sm:p-8"
-        >
-          <h2 className="font-display text-3xl text-gold sm:text-4xl">
-            {PRODUCT.name}
-          </h2>
-          <p className="mt-3 font-display text-4xl text-gold sm:text-5xl">
-            {PRODUCT.price}
-          </p>
-          <ul className="mt-6">
-            {PRODUCT.features.map((f) => (
-              <li
-                key={f}
-                className="flex items-center gap-4 border-t border-gold-dim/30 py-3 font-body text-sm text-gold/90 last:border-b"
-              >
-                <span aria-hidden className="text-gold-dim">
-                  —
-                </span>
-                {f}
-              </li>
-            ))}
-          </ul>
-        </section>
+        {!paid && (
+          <section
+            aria-label="Produto"
+            className="mb-12 rounded-2xl border border-gold-dim/40 bg-ink2 p-6 sm:p-8"
+          >
+            <h2 className="font-display text-3xl text-gold sm:text-4xl">
+              {PRODUCT.name}
+            </h2>
+            <p className="mt-3 font-display text-4xl text-gold sm:text-5xl">
+              {PRODUCT.price}
+            </p>
+            <ul className="mt-6">
+              {PRODUCT.features.map((f) => (
+                <li
+                  key={f}
+                  className="flex items-center gap-4 border-t border-gold-dim/30 py-3 font-body text-sm text-gold/90 last:border-b"
+                >
+                  <span aria-hidden className="text-gold-dim">
+                    —
+                  </span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-        <OrderForm />
+        <OrderForm paidOrder={paid} cancelledOrder={cancelled} />
       </div>
     </main>
   );
